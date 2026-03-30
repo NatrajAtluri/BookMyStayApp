@@ -1,86 +1,118 @@
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-/**
- * The RoomInventory class encapsulates the logic for managing room availability.
- * It uses a HashMap to provide O(1) lookup and update performance.
- * * @author Atluri Natraj
- * @version 3.0
- */
-class RoomInventory {
-    // HashMap to map Room Type (String) to Available Count (Integer)
-    private Map<String, Integer> inventory;
+// Domain Model: Room
+class Room {
+    private String type;
+    private double price;
+    private List<String> amenities;
 
-    public RoomInventory() {
-        this.inventory = new HashMap<>();
+    public Room(String type, double price, List<String> amenities) {
+        this.type = type;
+        this.price = price;
+        this.amenities = amenities;
     }
 
-    /**
-     * Registers or updates a room type in the inventory.
-     */
-    public void addRoomType(String type, int count) {
-        inventory.put(type, count);
+
+    public String getType() {
+        return type;
     }
 
-    /**
-     * Retrieves the current availability for a specific room type.
-     */
-    public int getAvailability(String type) {
-        return inventory.getOrDefault(type, 0);
+    public double getPrice() {
+        return price;
     }
 
-    /**
-     * Updates availability (e.g., after a booking or cancellation).
-     */
-    public void updateAvailability(String type, int change) {
-        if (inventory.containsKey(type)) {
-            int current = inventory.get(type);
-            inventory.put(type, current + change);
-        }
-    }
-
-    /**
-     * Displays the complete status of the inventory.
-     */
-    public void displayInventory() {
-        System.out.println("Current Inventory Status:");
-        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
-            System.out.println("- " + entry.getKey() + ": " + entry.getValue() + " available");
-        }
+    public List<String> getAmenities() {
+        return amenities;
     }
 }
 
-/**
- * Main application class: BookMyStayApp
- * Demonstrates centralized inventory management using HashMap.
- */
+// Inventory (State Holder)
+class Inventory {
+    private Map<String, Integer> roomAvailability = new HashMap<>();
+
+    public void addRoom(String roomType, int count) {
+        roomAvailability.put(roomType, count);
+    }
+
+    // Read-only access
+    public int getAvailability(String roomType) {
+        return roomAvailability.getOrDefault(roomType, 0);
+    }
+
+    // Read-only snapshot (prevents modification)
+    public Map<String, Integer> getAllAvailability() {
+        return Collections.unmodifiableMap(roomAvailability);
+    }
+}
+
+// Search Service (Read-only logic)
+class SearchService {
+    private Inventory inventory;
+    private Map<String, Room> roomCatalog;
+
+    public SearchService(Inventory inventory, Map<String, Room> roomCatalog) {
+        this.inventory = inventory;
+        this.roomCatalog = roomCatalog;
+    }
+
+    public List<Room> searchAvailableRooms() {
+        List<Room> availableRooms = new ArrayList<>();
+
+        for (Map.Entry<String, Integer> entry : inventory.getAllAvailability().entrySet()) {
+            String roomType = entry.getKey();
+            int count = entry.getValue();
+
+            // Defensive check
+            if (count <= 0) continue;
+
+            Room room = roomCatalog.get(roomType);
+            if (room != null) {
+                availableRooms.add(room);
+            }
+        }
+
+        return availableRooms;
+    }
+}
+
+// Main Application
 public class BookMyStayApp {
     public static void main(String[] args) {
-        System.out.println("========================================");
-        System.out.println("   Welcome to Book My Stay App v3.0     ");
-        System.out.println("========================================");
 
-        // 1. Initialize Centralized Inventory
-        RoomInventory hotelInventory = new RoomInventory();
+        // Setup Inventory
+        Inventory inventory = new Inventory();
+        inventory.addRoom("Deluxe", 3);
+        inventory.addRoom("Suite", 0);       // unavailable
+        inventory.addRoom("Standard", 5);
 
-        // 2. Register Room Types (Populating the HashMap)
-        hotelInventory.addRoomType("Single Room", 10);
-        hotelInventory.addRoomType("Double Room", 5);
-        hotelInventory.addRoomType("Suite Room", 2);
+        // Setup Room Catalog
+        Map<String, Room> roomCatalog = new HashMap<>();
 
-        // 3. Display Initial State
-        hotelInventory.displayInventory();
+        roomCatalog.put("Deluxe",
+                new Room("Deluxe", 4500,
+                        Arrays.asList("WiFi", "TV", "Mini Bar")));
 
-        // 4. Demonstrate Controlled Updates
-        System.out.println("\n--- Processing a Booking for Double Room ---");
-        hotelInventory.updateAvailability("Double Room", -1);
+        roomCatalog.put("Suite",
+                new Room("Suite", 8000,
+                        Arrays.asList("WiFi", "TV", "Jacuzzi")));
 
-        // 5. Retrieve Specific State
-        int currentDouble = hotelInventory.getAvailability("Double Room");
-        System.out.println("Updated Double Room count: " + currentDouble);
+        roomCatalog.put("Standard",
+                new Room("Standard", 2500,
+                        Arrays.asList("WiFi", "Fan")));
 
-        System.out.println("\n--- Final System State ---");
-        hotelInventory.displayInventory();
-        System.out.println("========================================");
+        // Search Service
+        SearchService searchService = new SearchService(inventory, roomCatalog);
+
+        // Guest performs search
+        System.out.println("Available Rooms:\n");
+
+        List<Room> results = searchService.searchAvailableRooms();
+
+        for (Room room : results) {
+            System.out.println("Room Type: " + room.getType());
+            System.out.println("Price: ₹" + room.getPrice());
+            System.out.println("Amenities: " + room.getAmenities());
+            System.out.println("-----------------------------");
+        }
     }
 }
